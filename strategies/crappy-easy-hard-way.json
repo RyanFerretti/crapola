@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "id": "crappy-easy-hard-way",
+  "name": "Crappy's easy hard way",
+  "description": "A $100 don't pass hedge on each new shooter, then $84 up once the point is set: place 4/10 for $10, place 6/8 for $12 and $10 on all four hardways. Place winnings are never collected; every easy hit of a 4/6/8/10 replaces the lost hardway with the place payout ($14 on hard 6/8, $18 on hard 4/10, each paying $126). A hard hit collects, keeps the hardway up and tops it up to that level. The don't pass is not replaced once it loses during a shooter's hand.",
+  "tags": ["imported", "crappy", "hardways", "dark-side", "place"],
+  "source": {
+    "type": "youtube",
+    "url": "https://www.youtube.com/watch?v=F-MUHZvNckQ",
+    "videoId": "F-MUHZvNckQ",
+    "title": "The easy hard way",
+    "channel": "Crappy the Crapsman",
+    "importedAt": "2026-11-05"
+  },
+  "unit": 10,
+  "bankroll": 1850,
+  "table": { "minBet": 10 },
+  "exit": { "maxShooters": 10 },
+  "variables": { "dpLost": false },
+  "rules": [
+    {
+      "id": "new-shooter",
+      "description": "Each new shooter gets a fresh don't pass",
+      "on": "newShooter",
+      "do": [{ "action": "set", "var": "dpLost", "value": false }]
+    },
+    {
+      "id": "dp-lost",
+      "description": "Come-out 7/11 or point made: 'don't chase it, don't replace it' for the rest of this hand",
+      "on": "betLost:dontPass",
+      "do": [{ "action": "set", "var": "dpLost", "value": true }]
+    },
+    {
+      "id": "dont-pass",
+      "description": "$100 don't pass on the come-out, more than covering the $84 of bets; re-bet after a 2/3 win since the bet stays up",
+      "on": "comeOut",
+      "when": "!dpLost",
+      "do": [{ "action": "bet", "type": "dontPass", "amount": 100 }]
+    },
+    {
+      "id": "pay-for-the-bets",
+      "description": "Point set: '$85 pays for all those bets' - place 4/10 $10, place 6/8 $12, $10 on each hardway ($84; the $1 change tips the dealers). Point number included. Ensure-mode so bets left up after a point made are not touched.",
+      "on": "pointEstablished",
+      "do": [
+        { "action": "bet", "type": "place", "numbers": [4, 10], "amount": 10 },
+        { "action": "bet", "type": "place", "numbers": [6, 8], "amount": 12 },
+        { "action": "bet", "type": "hardway", "numbers": [4, 6, 8, 10], "amount": 10 }
+      ]
+    },
+    {
+      "id": "hard-6",
+      "description": "6 rolls: place 6 pays $14; easy -> the $14 replaces the lost hard 6; hard -> hard 6 stays up and is topped up to $14 ($14 x 9 = $126)",
+      "on": "betWon:place:6",
+      "do": [{ "action": "bet", "type": "hardway", "number": 6, "amount": 14, "mode": "set" }]
+    },
+    {
+      "id": "hard-8",
+      "description": "8 rolls: place 8 pays $14; easy -> the $14 replaces the lost hard 8; hard -> hard 8 stays up and is topped up to $14",
+      "on": "betWon:place:8",
+      "do": [{ "action": "bet", "type": "hardway", "number": 8, "amount": 14, "mode": "set" }]
+    },
+    {
+      "id": "hard-4",
+      "description": "4 rolls: place 4 pays $18; easy -> the $18 replaces the lost hard 4; hard -> hard 4 stays up and is topped up to $18 ($18 x 7 = $126)",
+      "on": "betWon:place:4",
+      "do": [{ "action": "bet", "type": "hardway", "number": 4, "amount": 18, "mode": "set" }]
+    },
+    {
+      "id": "hard-10",
+      "description": "10 rolls: place 10 pays $18; easy -> the $18 replaces the lost hard 10; hard -> hard 10 stays up and is topped up to $18",
+      "on": "betWon:place:10",
+      "do": [{ "action": "bet", "type": "hardway", "number": 10, "amount": 18, "mode": "set" }]
+    }
+  ],
+  "notes": "1. Table and bankroll: $10 table, $1,850 buy-in ('a lot for a $10 table'). He plays 10 shooters per session ('we got enough here for 10 shooters'), so exit.maxShooters is 10. No win goal or stop loss is stated.\n2. The $84 is derived from the payouts he quotes: place 6/8 pay $14 (so $12 each), place 4/10 pay $18 (so $10 each), hardways $10 each = 44 + 40 = $84. He says 'there's a nine, no hard nine' and 'a five, no hard five, no worries' and never collects on 5 or 9, so there are no place bets on 5 and 9.\n3. He physically leaves the place/hardway bets up and pays $85 for them after each point is set ($84 of bets + $1 tip). This is modelled as placing them on pointEstablished. The point number gets its place bet and hardway like the others (he pays the full $85 with 8 as the point and later wins place 8 when the point 8 is made easy).\n4. Hardway sizing: the first easy hit of a 4/6/8/10 loses the $10 hardway and the place payout goes back on it ($14 on hard 6/8, $18 on hard 4/10 - '14 x 9 is 126, 18 x 7 is 126'). After that each easy hit is 'a wash'. Modelled with mode 'set' on betWon:place:N, which also handles the hard hit: when a $10 hardway hits hard he presses it to $14/$18 out of the winnings ('I am going to make it 14 cuz now that'll make it a wash', 'I am going to make it 18 so I'm going to collect 80 bucks'); a hardway already at $14/$18 is left alone and everything is collected ('we're already pressed up so I would just keep it'). He explicitly says he no longer presses beyond those levels.\n5. Don't pass: $100 on the new shooter's come-out. When it loses on a come-out 7/11 he does not replace it ('don't chase it, don't replace'); when the point is made he says 'we got to make it on our own now' and plays the next point without a don't pass. Modelled with the dpLost variable, reset per shooter. A come-out 2/3 win leaves the bet up in the casino; the engine removes a won don't pass, so the comeOut rule re-bets it.\n6. After a point is made the place bets and hardways stay up (off on the come-out, the table default) at whatever size they reached, and he does not buy a new $84. Ensure mode on pointEstablished reproduces this.\n7. Not modelled: the $1 dealer tip after each point (a bet for the dealers on the pass line or next to his don't pass), roughly $1 per point of extra cost; the DSL has no tip action and a $1 put bet would pay the player instead of the dealers.\n8. Not modelled: one ad-hoc move after a hard 4 win where he used $4 of the winnings to top up the hard 8 from $10 to $14 before it had hit ('it don't really matter'). Only the hardway whose number rolled is adjusted.\n9. Place 5/9 are never bet, so a 5 or 9 only matters to the don't pass.\n10. Dice reconstructed from the video, all ten shooters, for `play --dice`: \"4 6 9 3 3 8 6 H6 7  7 8 10 3 H6 6 4 3 H4 7  8 9 10 5 9 H4 2 H6 2 5 8 5 4 8 7  9 7  H6 12 7  6 6 6 8 7  7 2 7 6 11 8 7  9 9 7 9 7  2 8 9 9 7  8 6 8 9 6 9 H8 5 3 11 8 4 5 7\". The replay ends at -$376; he counted -$391 (1850 -> 1459). The $15 gap is the ten $1 tips, the one-off $4 hard 8 top-up (note 8) that lost on the seven-out, and his chip-count rounding."
+}

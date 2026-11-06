@@ -169,3 +169,112 @@ describe('interpreter', () => {
     expect(r.profit).toBe(200);
   });
 });
+
+describe('expression-valued number', () => {
+  test('generic press of the hardway behind a place win', () => {
+    const r = run(
+      [
+        { on: 'pointEstablished', do: [{ action: 'bet', type: 'place', numbers: [6, 8], amount: 12 }, { action: 'bet', type: 'hardway', numbers: [6, 8], amount: 10 }] },
+        { on: 'betWon:place', do: [{ action: 'bet', type: 'hardway', number: 'bet.number', amount: 'bet.payout', mode: 'add' }] },
+      ],
+      '4 3-5 2-4 3',
+    );
+    // easy 8: the hard 8 loses and place 8 pays 14, which buys a fresh hard 8 of $14; same for the easy 6
+    expect(r.log![2]!.betsAfter).toContain('Hard 8 $14');
+    expect(r.log![3]!.betsAfter).toContain('Hard 6 $14');
+  });
+});
+
+describe('agent-reported edge cases', () => {
+  test('walkAway stops later rules in the same decision point', () => {
+    const r = run(
+      [
+        { on: 'sessionStart', do: [{ action: 'walkAway', mode: 'rideOut' }] },
+        { on: 'comeOut', do: [{ action: 'bet', type: 'pass', amount: 10 }] },
+      ],
+      '7 7',
+    );
+    expect(r.endReason).toBe('walkedAway');
+    expect(r.profit).toBe(0);
+    expect(r.log![0]!.betsAfter).toEqual([]);
+  });
+
+  test('hasBet with number 0 finds a pending come bet', () => {
+    const r = run(
+      [
+        { on: 'comeOut', do: [{ action: 'bet', type: 'pass', amount: 10 }] },
+        { on: 'pointOn', when: "!hasBet('come', 0) && betCount('come') - betCount('come', 0) < 1", do: [{ action: 'bet', type: 'come', amount: 10 }] },
+        { on: 'pointOn', when: "hasBet('come', 0)", do: [{ action: 'log', message: 'come pending' }] },
+      ],
+      '4 5 9 3',
+    );
+    // the come goes up, then the next rule sees it pending in the same decision point
+    expect(r.log![1]!.logs).toEqual(['come pending']);
+    expect(r.log![1]!.betsAfter).toEqual(['Pass $10 (4)', 'Come $10']);
+    // after the come travels to 5, no second come goes up and nothing is pending
+    expect(r.log![2]!.logs).toEqual([]);
+    expect(r.log![2]!.betsAfter).toEqual(['Pass $10 (4)', 'Come $10 on 5']);
+  });
+
+  test('a strategy that cannot fund its bets busts instead of idling', () => {
+    const { strategy } = loadStrategy({ ...baseDoc, unit: 100, rules: [{ on: 'comeOut', do: [{ action: 'bet', type: 'pass', amount: 100 }] }] });
+    const r = runSession(strategy, { bankroll: 150, seed: 3, maxShooters: 50, fixedRolls: parseRolls('7 2 2 2 4 7 5 7') });
+    expect(r.endReason).toBe('busted');
+    expect(r.endBankroll).toBeLessThan(100);
+    expect(r.shooters).toBeLessThan(50);
+  });
+});
+
+describe('if/else chains', () => {
+  test('action-level when and rule stop', () => {
+    const r = run(
+      [
+        { on: 'pointEstablished', do: [{ action: 'bet', type: 'place', numbers: [6, 8], amount: 12 }] },
+        {
+          id: 'spend-the-win',
+          on: 'betWon:place',
+          stop: true,
+          do: [
+            { action: 'bet', type: 'place', number: 5, amount: 10, when: "!hasBet('place', 5)" },
+            { action: 'bet', type: 'place', number: 9, amount: 10, when: "hasBet('place', 5) && !hasBet('place', 9)" },
+            { action: 'log', message: 'collect', when: "hasBet('place', 5) && hasBet('place', 9)" },
+          ],
+        },
+        { on: 'betWon:place', do: [{ action: 'log', message: 'never reached' }] },
+      ],
+      '4 6 8 6 6 3',
+    );
+    expect(r.log![2]!.betsAfter).toEqual(['Place 6 $12', 'Place 8 $12', 'Place 5 $10']);
+    expect(r.log![3]!.betsAfter).toEqual(['Place 6 $12', 'Place 8 $12', 'Place 5 $10', 'Place 9 $10']);
+    expect(r.log![4]!.logs).toEqual(['collect']);
+    expect(r.log!.flatMap((l) => l.logs)).not.toContain('never reached');
+  });
+
+  test('failed presses are reported as rejections', () => {
+    const { strategy } = loadStrategy({
+      ...baseDoc,
+      rules: [
+        { on: 'pointEstablished', do: [{ action: 'bet', type: 'place', number: 6, amount: 12 }] },
+        { on: 'betWon:place:6', do: [{ action: 'press', target: 'self', by: 500 }] },
+      ],
+    });
+    const r = runSession(strategy, { bankroll: 100, fixedRolls: parseRolls('4 6 3'), recordLog: true });
+    expect(r.rejectedBets).toBe(1);
+    expect(r.log![2]!.actions.join(' ')).toContain('rejected press');
+  });
+
+  test('up-front vig comes back when a buy bet is taken down', () => {
+    const { strategy } = loadStrategy({
+      ...baseDoc,
+      table: { minBet: 5, buyVig: 'up-front' },
+      rules: [
+        { on: 'pointEstablished', do: [{ action: 'bet', type: 'buy', number: 4, amount: 25 }] },
+        { on: 'roll', when: "hasBet('buy', 4) && rollsSincePoint >= 1", do: [{ action: 'takeDown', target: 'buy:4' }] },
+      ],
+    });
+    const r = runSession(strategy, { bankroll: 100, fixedRolls: parseRolls('6 3 5'), recordLog: true });
+    expect(r.log![1]!.bankroll).toBe(74);
+    expect(r.log![2]!.bankroll).toBe(100);
+    expect(r.totalVig).toBe(0);
+  });
+});

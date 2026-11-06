@@ -32,6 +32,8 @@ export interface RollRecord {
   outcomes: string[];
   actions: string[];
   logs: string[];
+  /** Actions ("> ...") and logs ("# ...") in the order they happened. */
+  trace: string[];
   bankroll: number;
   equity: number;
   betsAfter: string[];
@@ -81,6 +83,9 @@ export class Session {
   private pointStartEquity: number;
   private rejected = 0;
   private unresolvedReturned = 0;
+  private placedThisDecision = 0;
+  private rejectedForFundsThisDecision = 0;
+  private stalledSinceShooter: number | null = null;
 
   constructor(
     readonly strategy: Strategy,
@@ -100,10 +105,14 @@ export class Session {
     const seeded = new SeededDice(this.seed);
     this.dice = config.fixedRolls?.length ? new FixedDice(config.fixedRolls, config.maxShooters || config.maxRolls ? seeded : undefined) : seeded;
     this.player = new Player(config.bankroll, {
-      placed: (bet, added) => this.note(`bet ${describeBet(bet)}${added !== bet.amount ? ` (+$${added})` : ''}`),
+      placed: (bet, added) => {
+        this.placedThisDecision++;
+        this.note(`bet ${describeBet(bet)}${added !== bet.amount ? ` (+$${added})` : ''}`);
+      },
       removed: (bet, reason) => this.note(`down ${describeBet(bet)} (${reason})`),
       rejected: (req, reason) => {
         this.rejected++;
+        if (reason.startsWith('insufficient bankroll')) this.rejectedForFundsThisDecision++;
         this.note(`rejected ${req.type}${req.number ? ` ${req.number}` : ''} $${req.amount}: ${reason}`);
       },
     });
@@ -114,7 +123,9 @@ export class Session {
   }
 
   private note(msg: string): void {
-    this.current?.actions.push(msg);
+    if (!this.current) return;
+    this.current.actions.push(msg);
+    this.current.trace.push(`> ${msg}`);
   }
 
   private makeApi(): ActionApi {
@@ -131,7 +142,15 @@ export class Session {
         for (const b of targets) if (player.remove(b, reason).ok) n++;
         return n;
       },
-      adjust: (bet, amount) => player.adjust(bet, amount, table, rules),
+      adjust: (bet, amount) => {
+        const r = player.adjust(bet, amount, table, rules);
+        if (!r.ok) {
+          self.rejected++;
+          if (r.reason.startsWith('insufficient bankroll')) self.rejectedForFundsThisDecision++;
+          self.note(`rejected ${amount > bet.amount ? 'press' : 'regress'} of ${describeBet(bet)} to $${amount}: ${r.reason}`);
+        }
+        return r;
+      },
       setWorking: (sel, working) => {
         let n = 0;
         for (const b of player.bets.filter((b) => matchBet(b, sel))) if (player.setWorking(b, working)) n++;
@@ -146,7 +165,9 @@ export class Session {
         }
       },
       log: (message) => {
-        self.current?.logs.push(message);
+        if (!self.current) return;
+        self.current.logs.push(message);
+        self.current.trace.push(`# ${message}`);
       },
     };
   }
@@ -162,7 +183,15 @@ export class Session {
       pointStartEquity: this.pointStartEquity,
       api: this.makeApi(),
     };
+    this.placedThisDecision = 0;
+    this.rejectedForFundsThisDecision = 0;
     this.strat.decide(ctx);
+    // A strategy that keeps asking for bets it cannot fund, with nothing on the table, is broke
+    // even if the rack still holds a few chips. Give it one full shooter to recover.
+    if (this.player.bets.length === 0 && this.rejectedForFundsThisDecision > 0 && this.placedThisDecision === 0) {
+      if (this.stalledSinceShooter === null) this.stalledSinceShooter = this.table.shooterIndex;
+      else if (this.table.shooterIndex > this.stalledSinceShooter && !this.windingDown) this.windingDown = 'busted';
+    } else if (this.player.bets.length > 0 || this.placedThisDecision > 0) this.stalledSinceShooter = null;
   }
 
   private startRecord(roll: Roll | null, pointBefore: number | null): void {
@@ -178,6 +207,7 @@ export class Session {
       outcomes: [],
       actions: [],
       logs: [],
+      trace: [],
       bankroll: 0,
       equity: 0,
       betsAfter: [],

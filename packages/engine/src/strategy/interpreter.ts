@@ -60,7 +60,7 @@ export const BUILTIN_IDS: Record<string, string> = {
 };
 
 export const BUILTIN_FNS: Record<string, string> = {
-  hasBet: "hasBet(type[, number]) - true if such a bet is on the table, e.g. hasBet('place', 6)",
+  hasBet: "hasBet(type[, number]) - true if such a bet is on the table, e.g. hasBet('place', 6); number 0 means a come/don't come that has not travelled yet",
   betCount: 'betCount([type[, number]]) - how many matching bets are up',
   betAmount: 'betAmount(type[, number]) - amount of the matching bet (0 if none)',
   totalOn: "totalOn(type|group) - total staked on a type or group ('inside', 'across', 'all')",
@@ -199,6 +199,7 @@ export function validateStrategyDoc(input: unknown): { ok: true; doc: StrategyDo
     checkExpr(rule.when, `${rp}.when`, known, issues);
     rule.do.forEach((a, ai) => {
       const ap = `${rp}.do[${ai}](${a.action})`;
+      checkExpr(a.when, `${ap}.when`, known, issues);
       switch (a.action) {
         case 'bet': {
           checkExpr(a.amount, `${ap}.amount`, known, issues);
@@ -206,7 +207,8 @@ export function validateStrategyDoc(input: unknown): { ok: true; doc: StrategyDo
           checkExpr(a.maxAmount, `${ap}.maxAmount`, known, issues);
           const needsNumber = NUMBERED_TYPES.has(a.type as BetType);
           if (needsNumber && a.number === undefined && a.numbers === undefined) issues.push({ path: ap, message: `${a.type} needs "number" or "numbers"` });
-          if (a.number !== undefined && !isBoxNumber(a.number) && a.type !== 'hop') issues.push({ path: ap, message: `number must be 4, 5, 6, 8, 9 or 10` });
+          if (typeof a.number === 'string') checkExpr(a.number, `${ap}.number`, known, issues);
+          else if (a.number !== undefined && !isBoxNumber(a.number) && a.type !== 'hop') issues.push({ path: ap, message: `number must be 4, 5, 6, 8, 9 or 10` });
           if (a.type === 'hardway' && (a.number === 5 || a.number === 9)) issues.push({ path: ap, message: 'hardways exist only on 4, 6, 8, 10' });
           if (a.type === 'odds') {
             if (!a.on) issues.push({ path: ap, message: 'odds need "on": pass | come | dontPass | dontCome' });
@@ -228,9 +230,14 @@ export function validateStrategyDoc(input: unknown): { ok: true; doc: StrategyDo
         case 'setWorking':
           checkSelector(a.target, `${ap}.target`, issues);
           break;
-        case 'set':
+        case 'set': {
+          const before = issues.length;
           checkExpr(a.value, `${ap}.value`, known, issues);
+          if (issues.length > before && typeof a.value === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(a.value)) {
+            issues[issues.length - 1]!.message += ` (to store the text "${a.value}" write "'${a.value}'")`;
+          }
           break;
+        }
         case 'increment':
           checkExpr(a.by, `${ap}.by`, known, issues);
           break;
@@ -259,6 +266,7 @@ interface CompiledRule {
   when?: Ast;
   actions: Action[];
   once?: Rule['once'];
+  stop: boolean;
 }
 
 interface Current {
@@ -275,6 +283,7 @@ class DslSession implements StrategySession {
   private firedPoint = new Map<number, string>();
   private pointCycle = 0;
   private sitOut: SitOut | null = null;
+  private halted = false;
 
   constructor(
     private readonly doc: StrategyDoc,
@@ -292,6 +301,7 @@ class DslSession implements StrategySession {
   decide(ctx: DecisionContext): void {
     const events = ctx.events;
     if (events.some((e) => e.kind === 'pointEstablished')) this.pointCycle++;
+    if (this.halted) return;
 
     if (this.sitOut) {
       const so = this.sitOut;
@@ -322,13 +332,17 @@ class DslSession implements StrategySession {
         if (rule.when && !truthy(evaluate(rule.when, scope))) continue;
         this.markFired(rule, ctx);
         firedThisDecision = true;
-        for (const action of rule.actions) {
-          this.execute(action, ctx, scope, current);
-          if (this.sitOut) break;
+        // Action conditions describe the state the rule saw, so a list of them reads as if/else.
+        const enabled = rule.actions.map((a) => !a.when || truthy(evaluate(parseExpr(a.when), scope)));
+        for (let i = 0; i < rule.actions.length; i++) {
+          if (!enabled[i]) continue;
+          this.execute(rule.actions[i]!, ctx, scope, current);
+          if (this.sitOut || this.halted) break;
         }
-        if (this.sitOut) break;
+        if (this.sitOut || this.halted) break;
       }
-      if (this.sitOut) break;
+      if (this.sitOut || this.halted) break;
+      if (firedThisDecision && rule.stop) break;
     }
   }
 
@@ -405,8 +419,10 @@ class DslSession implements StrategySession {
       on: b.on ?? null,
       tag: b.tag ?? null,
     });
+    // number 0 means "no number yet": a come/don't come still waiting to travel.
     const matches = (type: Value, number: Value) => (b: Bet) =>
-      (type === undefined || type === 'all' || b.type === type) && (number === undefined || b.number === Number(number));
+      (type === undefined || type === 'all' || b.type === type) &&
+      (number === undefined || (Number(number) === 0 ? b.number == null : b.number === Number(number)));
 
     return {
       unit: ctx.unit,
@@ -578,7 +594,7 @@ class DslSession implements StrategySession {
           else delta = evalNumber(by, scope);
           if (delta <= 0) continue;
           const inc = betIncrement(t.type, t.number, t.on);
-          let target = roundToIncrement(t.amount + delta, inc, this.rounding(action.rounding, 'down'));
+          let target = roundToIncrement(t.amount + delta, inc, action.rounding ?? 'down');
           target = Math.min(target, max);
           if (target <= t.amount) continue;
           ctx.api.adjust(t, target);
@@ -623,6 +639,7 @@ class DslSession implements StrategySession {
         return;
       case 'walkAway':
         ctx.api.walkAway(action.mode);
+        this.halted = true;
         return;
       case 'log':
         ctx.api.log(interpolate(action.message, scope));
@@ -636,13 +653,19 @@ class DslSession implements StrategySession {
     const { player, table, rules } = ctx;
     const rounding = this.rounding(action.rounding);
 
+    const explicitNumber = action.number === undefined ? undefined : typeof action.number === 'number' ? action.number : evalNumber(action.number, scope);
+    if (explicitNumber !== undefined && type !== 'hop' && !isBoxNumber(explicitNumber)) {
+      ctx.api.log(`skipped ${type}: ${explicitNumber} is not a box number`);
+      return;
+    }
+
     if (type === 'odds') {
       const on = action.on!;
       const flats = player.bets.filter(
         (b) =>
           b.type === on &&
           b.number != null &&
-          (action.number === undefined || b.number === action.number) &&
+          (explicitNumber === undefined || b.number === explicitNumber) &&
           (action.numbers === undefined || this.numbersOf(action.numbers, table.point).includes(b.number)),
       );
       for (const flat of flats) {
@@ -668,7 +691,7 @@ class DslSession implements StrategySession {
     }
 
     const numbers: Array<number | undefined> = NUMBERED_TYPES.has(type)
-      ? this.numbersOf(action.numbers ?? [action.number!], table.point, action.skipPoint)
+      ? this.numbersOf(action.numbers ?? [explicitNumber!], table.point, action.skipPoint)
       : [undefined];
 
     for (const number of numbers) {
@@ -685,7 +708,7 @@ class DslSession implements StrategySession {
       if (amount <= 0) continue;
       if (mode === 'set' && existing) {
         if (existing.amount !== amount) ctx.api.adjust(existing, amount);
-        if (action.working !== undefined) ctx.api.setWorking({ type, number }, action.working);
+        if (action.working !== undefined && existing.workingOverride !== action.working) ctx.api.setWorking({ type, number }, action.working);
         continue;
       }
       const req: BetRequest = { type, amount, working: action.working, tag: action.tag };
@@ -738,6 +761,7 @@ export function compileStrategy(doc: StrategyDoc): Strategy {
         when: r.when ? parseExpr(r.when) : undefined,
         actions: r.do,
         once: r.once,
+        stop: r.stop === true,
       };
     });
 

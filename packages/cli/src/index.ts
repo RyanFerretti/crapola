@@ -66,6 +66,11 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   process.exit(0);
 }
 
+if (argv.includes('--help') || argv.includes('-h')) {
+  console.log(HELP);
+  process.exit(0);
+}
+
 const { values, positionals } = parseArgs({
   args: argv.slice(1),
   allowPositionals: true,
@@ -194,9 +199,9 @@ async function main(): Promise<void> {
         const t0 = performance.now();
         const batch = runBatch(strategy, {
           ...config,
-          onProgress: values.quiet || values.json ? undefined : (done, total) => process.stderr.write(`\r${strategy.id}: ${done}/${total}`),
+          onProgress: values.quiet || values.json || !process.stderr.isTTY ? undefined : (done, total) => process.stderr.write(`\r${strategy.id}: ${done}/${total}`),
         });
-        if (!values.quiet && !values.json) process.stderr.write(`\r${strategy.id}: ${config.sessions} sessions in ${((performance.now() - t0) / 1000).toFixed(1)}s\n`);
+        if (!values.quiet && !values.json) process.stderr.write(`${process.stderr.isTTY ? '\r' : ''}${strategy.id}: ${config.sessions} sessions in ${((performance.now() - t0) / 1000).toFixed(1)}s\n`);
         batches.push(batch);
       }
       if (values.csv) writeCsv(values.csv, batches);
@@ -247,8 +252,9 @@ async function main(): Promise<void> {
       const r = runSession(strategy, {
         bankroll: num(values.bankroll) ?? doc.bankroll ?? 1000,
         unit: num(values.unit),
+        // With scripted dice and no caps the session ends when the script runs out, after the last reaction.
         maxShooters: num(values.shooters) ?? (values.rolls || fixedRolls ? undefined : 3),
-        maxRolls: num(values.rolls) ?? (fixedRolls && !values.shooters ? fixedRolls.length : undefined),
+        maxRolls: num(values.rolls),
         stopLoss: num(values['stop-loss']),
         winGoal: num(values['win-goal']),
         seed: num(values.seed) ?? Math.floor(Math.random() * 1e9),
@@ -268,12 +274,11 @@ async function main(): Promise<void> {
           console.log(`#${l.rollNumber} shooter ${l.shooterIndex} (${pt}) rolled ${l.d1}-${l.d2} = ${l.total}${l.pointAfter !== l.pointBefore ? (l.pointAfter ? `  -> point ${l.pointAfter}` : l.total === 7 ? '  -> seven out' : '  -> point made') : ''}`);
         }
         for (const o of l.outcomes) console.log(`    ${o}`);
-        for (const a of l.actions) console.log(`    > ${a}`);
-        for (const g of l.logs) console.log(`    # ${g}`);
+        for (const t of l.trace) console.log(`    ${t}`);
         if (l.state && Object.keys(l.state).length) console.log(`    state ${JSON.stringify(l.state)}`);
         console.log(`    bankroll ${money(l.bankroll)}  on table ${money(l.equity - l.bankroll)}  equity ${money(l.equity)}${l.betsAfter.length ? `  [${l.betsAfter.join(', ')}]` : ''}`);
       }
-      console.log(`\nend: ${r.endReason} after ${r.rolls} rolls / ${r.shooters} shooters. profit ${money(r.profit)} (peak ${money(r.peakEquity - r.startBankroll)}, max drawdown ${money(r.maxDrawdown)}, wagered ${money(r.totalWagered)})`);
+      console.log(`\nend: ${r.endReason === 'diceExhausted' ? 'dice script finished' : r.endReason} after ${r.rolls} rolls / ${r.shooters} shooters. profit ${money(r.profit)} (peak ${money(r.peakEquity - r.startBankroll)}, max drawdown ${money(r.maxDrawdown)}, wagered ${money(r.totalWagered)})`);
       return;
     }
 

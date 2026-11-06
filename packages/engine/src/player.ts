@@ -207,6 +207,11 @@ export class Player {
     if (idx < 0) return { ok: false, reason: 'bet not on table' };
     this.bets.splice(idx, 1);
     this.bankroll += bet.amount;
+    // Commission paid up front comes back when the bet is taken down.
+    if (bet.vigPaid) {
+      this.bankroll += bet.vigPaid;
+      this.totalVig -= bet.vigPaid;
+    }
     // Odds riding on a removed don't bet come down with it.
     if (bet.type === 'dontPass' || bet.type === 'dontCome') {
       for (const o of this.bets.filter((b) => b.type === 'odds' && b.on === bet.type && b.number === bet.number)) {
@@ -246,9 +251,20 @@ export class Player {
     if (rules.enforceMinimums && MIN_BET_TYPES.has(bet.type) && target < rules.minBet) {
       return { ok: false, reason: `$${target} is below the table minimum $${rules.minBet}` };
     }
-    if (delta > this.bankroll) return { ok: false, reason: `insufficient bankroll ($${this.bankroll}) to press by $${delta}` };
-    this.bankroll -= delta;
+    let vig = 0;
+    if (delta > 0 && bet.type === 'buy' && rules.buyVig === 'up-front') vig = computeVig(delta, rules);
+    if (delta > 0 && bet.type === 'lay' && rules.layVig === 'up-front') {
+      const n = bet.number!;
+      const [a, b] = n === 4 || n === 10 ? [1, 2] : n === 5 || n === 9 ? [2, 3] : [5, 6];
+      vig = computeVig(Math.floor((delta * a) / b), rules);
+    }
+    if (delta + vig > this.bankroll) return { ok: false, reason: `insufficient bankroll ($${this.bankroll}) to press by $${delta + vig}` };
+    this.bankroll -= delta + vig;
     if (delta > 0) this.totalWagered += delta;
+    if (vig) {
+      this.totalVig += vig;
+      bet.vigPaid = (bet.vigPaid ?? 0) + vig;
+    }
     bet.amount = target;
     if (delta > 0) this.log?.placed(bet, delta);
     else this.log?.removed({ ...bet, amount: -delta }, 'regressed');
@@ -264,7 +280,13 @@ export class Player {
   /** Return every remaining stake to the bankroll (end of session). */
   cashOut(): number {
     let total = 0;
-    for (const b of this.bets) total += b.amount;
+    for (const b of this.bets) {
+      total += b.amount;
+      if (b.vigPaid) {
+        total += b.vigPaid;
+        this.totalVig -= b.vigPaid;
+      }
+    }
     this.bankroll += total;
     this.bets = [];
     return total;

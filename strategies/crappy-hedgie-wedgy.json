@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "id": "crappy-hedgie-wedgy",
+  "name": "Hedgie Wedgy (Crappy)",
+  "description": "Doey-don't (pass and don't pass together) with a hop 12 as come-out insurance. Once a point is set, lay odds behind the don't pass sized to win the flat bet, put up one don't come, and hop the 11 to insure it. When the don't come lands on a number, pull the lay odds and root for the seven with nothing else up. If the don't come loses while a point is on, set it up again. One don't come at a time, no progression.",
+  "tags": ["imported", "crappy", "hedge", "dark-side", "props"],
+  "source": {
+    "type": "youtube",
+    "url": "https://www.youtube.com/watch?v=ChZYq89MPjc",
+    "videoId": "ChZYq89MPjc",
+    "title": "Hedgie Wedgy craps strategy",
+    "channel": "Crappy the Crapsman",
+    "importedAt": "2026-11-05"
+  },
+  "unit": 100,
+  "bankroll": 2000,
+  "table": { "minBet": 10 },
+  "variables": { "dcNumber": 0 },
+  "rules": [
+    {
+      "id": "dc-travelled",
+      "description": "The don't come moved to a box number: remember it, pull the lay odds, and wait for the seven.",
+      "on": "betMoved:dontCome",
+      "do": [
+        { "action": "set", "var": "dcNumber", "value": "bet.number" },
+        { "action": "takeDown", "target": "odds:dontPass" },
+        { "action": "log", "message": "don't come set on {dcNumber}: lay odds come down, rooting for the seven" }
+      ]
+    },
+    {
+      "id": "dc-resolved",
+      "description": "A travelled don't come won (seven) or lost (its number rolled): the slot is open again.",
+      "on": ["betWon:dontCome", "betLost:dontCome"],
+      "when": "bet.number > 0",
+      "do": [{ "action": "set", "var": "dcNumber", "value": 0 }]
+    },
+    {
+      "id": "walk-when-short",
+      "description": "Importer assumption: the hedge only works as a whole package, so once the rack cannot fund a full cycle (come-out package plus the worst-case 4/10 setup) at a come-out with no don't come riding, quit rather than put up half a hedge.",
+      "on": "comeOut",
+      "when": "dcNumber == 0 && bankroll < 5 * unit + ceil(unit / 20) + ceil(unit / 10)",
+      "do": [
+        { "action": "log", "message": "rack ${bankroll} cannot cover a full hedge cycle; walking" },
+        { "action": "walkAway" }
+      ]
+    },
+    {
+      "id": "doey-dont",
+      "description": "Every come-out: pass and don't pass for a unit each, plus a hop 12 so the 12 (pass loses, don't pass bars) pays instead of costing a unit. With a don't come riding the rack only has to cover these three (never a pass line without its don't pass); otherwise it has to cover a full cycle, matching walk-when-short.",
+      "on": "comeOut",
+      "when": "dcNumber != 0 ? (bankroll >= 2 * unit + ceil(unit / 20)) : (bankroll >= 5 * unit + ceil(unit / 20) + ceil(unit / 10))",
+      "do": [
+        { "action": "bet", "type": "pass", "amount": "1u" },
+        { "action": "bet", "type": "dontPass", "amount": "1u" },
+        { "action": "bet", "type": "twelve", "amount": "ceil(unit / 20)", "tag": "insurance" }
+      ]
+    },
+    {
+      "id": "setup",
+      "description": "Point on and no don't come sitting on a number: lay odds to win the flat (2u on 4/10, 1.5u on 5/9; 1.5u on 6/8 wins 1.25u), a don't come, and a hop 11 to cover the don't come against the yo. Re-fires after a 2/3/11/12 resolves the pending don't come and after a set don't come loses.",
+      "on": "pointOn",
+      "when": "dcNumber == 0 && bankroll >= ((point == 4 || point == 10) ? 2 * unit : 1.5 * unit) + unit + ceil(unit / 10)",
+      "do": [
+        { "action": "bet", "type": "odds", "on": "dontPass", "amount": "(point == 4 || point == 10) ? 2 * unit : 1.5 * unit" },
+        { "action": "bet", "type": "dontCome", "amount": "1u" },
+        { "action": "bet", "type": "eleven", "amount": "ceil(unit / 10)", "tag": "insurance" }
+      ]
+    }
+  ],
+  "notes": "Played at the '$100 level' with a $2,000 buy-in, so unit is 100: pass $100, don't pass $100, don't come $100, lay odds $200 on 4/10 and $150 on 5/9/6/8, hop 12 $5, hop 11 $10. He says the $10 or $25 level works too; the hops scale as ceil(unit/20) and ceil(unit/10) so they still cover the flat bet (at the $10 level that is $1 each; the 6/8 lay of 1.5u rounds down to the $6 step, e.g. $12 at the $10 level). Table minimum is never stated (home table); $10 is used and only matters for the busted check since every real bet is $100. 'Hop the 12' / 'hop the 11' are entered as the twelve (30:1) and eleven (15:1) props, which pay the same as the hard-hop 12 and easy-hop 11 on this engine. Assumptions: (1) the doey-don't and the hop 12 go up on every come-out roll, including the come-out after a point is made and after a 12 hits ('replace our bet'); (2) after the don't come travels, the lay odds come down the same roll and nothing new goes up until the don't come resolves; (3) when the pending don't come resolves on a 2, 3 or 11 the don't come and the hop 11 are re-bet immediately with the lay odds left up, and on a bar-12 only the hop 11 is re-bet; (4) when a set don't come loses while a point is on (including the come-out roll that both knocks it off and sets that number as the point) the full setup goes back up at the same size, no martingale ('it loses, don't do it'); (5) if the pending don't come travels to the point on the point-made roll it stays there without lay odds and the next point gets no new setup, since he only ever plays one don't come; (6) no win goal, stop loss or shooter count is stated (he played five shooters for video time and finished +$560), so exit is left to the run defaults; (7) he never says what he does when the rack runs short ('if you had that losing streak in the beginning you would be in trouble'), so the importer added bankroll guards: each package (doey-don't plus hop 12; lay odds plus don't come plus hop 11) only goes up when the rack covers all of it, and at a come-out with no don't come riding and less than one full worst-case cycle in the rack (5u plus both hops, $515 at the $100 level) the session walks away; this keeps the hedge whole and removes every rejected bet, and it only ever changes sessions that are already down roughly $1,500. Deliberately left out because he says he does not play them: placing the 6 or 8 for $102 when the don't come lands there, a $10-15 hard 4/10 when it lands on 4/10, and placing the numbers after the don't come is set (he tried it and said it did worse)."
+}

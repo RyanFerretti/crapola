@@ -1,0 +1,331 @@
+{
+  "version": 1,
+  "id": "crappy-place-to-lay",
+  "name": "Crappy's place to lay",
+  "description": "Place the 8 for $120 and lay the 6 for $120, working on the come-out, betting the 8 shows before the 6. A 6 steps both bets up $120 (240/240, 360/360...). A 7 resets to 120/120. When the 8 hits, pull the lay, bank $10 and turn the place 8 into $110 inside; build each inside number to the $49-pay level (5/9 to $35, 6/8 to $42) with its own winnings, then buy the 4 and 10 for $25 each and collect.",
+  "tags": [
+    "youtube",
+    "crappy",
+    "right-side",
+    "lay",
+    "place",
+    "buy",
+    "progression",
+    "press"
+  ],
+  "author": "Crappy the Crapsman",
+  "source": {
+    "type": "youtube",
+    "url": "https://www.youtube.com/watch?v=9CrEZy0T_r0",
+    "videoId": "9CrEZy0T_r0",
+    "title": "My best craps strategy yet - A place to lay",
+    "channel": "Crappy the Crapsman",
+    "importedAt": "2026-11-05"
+  },
+  "unit": 120,
+  "bankroll": 2000,
+  "table": {
+    "minBet": 25,
+    "layVig": "up-front"
+  },
+  "variables": {
+    "level": 1,
+    "phase": "lay",
+    "lastBuildRoll": 0
+  },
+  "rules": [
+    {
+      "id": "seven-while-laying",
+      "description": "The lay only wins on a 7: the place 8 is gone with it. Reset the progression to 120/120.",
+      "on": "betWon:lay:6",
+      "when": "phase == 'lay'",
+      "do": [
+        {
+          "action": "log",
+          "message": "seven while laying: lay paid {bet.payout}, place 8 lost. back to level 1"
+        },
+        {
+          "action": "set",
+          "var": "level",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "seven-out-inside",
+      "description": "Seven-out with the inside/across spread up: everything is gone, start over at 120/120 with the next shooter.",
+      "on": "sevenOut",
+      "when": "phase == 'inside'",
+      "do": [
+        {
+          "action": "log",
+          "message": "seven out on the spread. back to the lay at level 1"
+        },
+        {
+          "action": "set",
+          "var": "phase",
+          "value": "'lay'"
+        },
+        {
+          "action": "set",
+          "var": "level",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "six-while-laying",
+      "description": "A 6 beats the lay: go up one step ($120) on both the lay and the place 8.",
+      "on": "betLost:lay:6",
+      "when": "phase == 'lay'",
+      "do": [
+        {
+          "action": "increment",
+          "var": "level"
+        },
+        {
+          "action": "log",
+          "message": "six beat the lay. up one: lay 6 and place 8 both go to {120 * level}"
+        }
+      ]
+    },
+    {
+      "id": "eight-while-laying",
+      "description": "The 8 hit first: collect, pull the lay, bank $10 and turn the place 8 into $110 inside (off on the come-out from here).",
+      "on": "betWon:place:8",
+      "when": "phase == 'lay'",
+      "do": [
+        {
+          "action": "log",
+          "message": "eight before six at level {level}: place 8 paid {bet.payout}. pull the lay, bank 10, 110 inside"
+        },
+        {
+          "action": "takeDown",
+          "target": "lay:6"
+        },
+        {
+          "action": "set",
+          "var": "phase",
+          "value": "'inside'"
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        },
+        {
+          "action": "regress",
+          "target": "place:8",
+          "to": 30
+        },
+        {
+          "action": "setWorking",
+          "target": "place:8",
+          "working": null
+        },
+        {
+          "action": "bet",
+          "type": "place",
+          "number": 6,
+          "amount": 30
+        },
+        {
+          "action": "bet",
+          "type": "place",
+          "numbers": [
+            5,
+            9
+          ],
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "id": "cannot-fund-next-level",
+      "description": "Assumption: if the rack cannot cover the next step of the progression, the session is over.",
+      "when": "phase == 'lay' && bankroll < 240 * level + 5 * level - betAmount('place', 8) - betAmount('lay', 6)",
+      "do": [
+        {
+          "action": "log",
+          "message": "cannot fund level {level} ({240 * level + 5 * level - betAmount('place', 8) - betAmount('lay', 6)} needed incl. lay vig, {bankroll} in the rack). walking"
+        },
+        {
+          "action": "set",
+          "var": "phase",
+          "value": "'done'"
+        },
+        {
+          "action": "walkAway"
+        }
+      ]
+    },
+    {
+      "id": "lay-setup",
+      "description": "Lay the 6 and place the 8 for $120 x level, both working on the come-out. The lay goes first so a lay left up from a higher level is regressed (refunded) before the place 8 is bought.",
+      "when": "phase == 'lay' && (betAmount('lay', 6) != 120 * level || betAmount('place', 8) != 120 * level)",
+      "do": [
+        {
+          "action": "bet",
+          "type": "lay",
+          "number": 6,
+          "amount": "120 * level",
+          "mode": "set"
+        },
+        {
+          "action": "bet",
+          "type": "place",
+          "number": 8,
+          "amount": "120 * level",
+          "mode": "set",
+          "working": true
+        }
+      ]
+    },
+    {
+      "id": "build-self-5-9",
+      "description": "An unbuilt 5 or 9 hits ($35): press it to $35 with $10 of the win, collect the rest.",
+      "on": [
+        "betWon:place:5",
+        "betWon:place:9"
+      ],
+      "when": "phase == 'inside' && bet.amount < 35",
+      "do": [
+        {
+          "action": "press",
+          "target": "self",
+          "max": 35
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    },
+    {
+      "id": "build-self-6-8",
+      "description": "An unbuilt 6 or 8 hits ($35): press it to $42 with $12, collect the rest.",
+      "on": [
+        "betWon:place:6",
+        "betWon:place:8"
+      ],
+      "when": "phase == 'inside' && bet.amount < 42",
+      "do": [
+        {
+          "action": "press",
+          "target": "self",
+          "max": 42
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    },
+    {
+      "id": "build-6-with-a-49",
+      "description": "A built number hit ($49): use it to build the 6 if it is still at $30.",
+      "on": "betWon:place",
+      "when": "phase == 'inside' && lastBuildRoll != rollNumber && betAmount('place', 6) < 42",
+      "do": [
+        {
+          "action": "bet",
+          "type": "place",
+          "number": 6,
+          "amount": 42,
+          "mode": "set"
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    },
+    {
+      "id": "build-8-with-a-49",
+      "on": "betWon:place",
+      "when": "phase == 'inside' && lastBuildRoll != rollNumber && betAmount('place', 8) < 42",
+      "do": [
+        {
+          "action": "bet",
+          "type": "place",
+          "number": 8,
+          "amount": 42,
+          "mode": "set"
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    },
+    {
+      "id": "build-5-with-a-49",
+      "on": "betWon:place",
+      "when": "phase == 'inside' && lastBuildRoll != rollNumber && betAmount('place', 5) < 35",
+      "do": [
+        {
+          "action": "bet",
+          "type": "place",
+          "number": 5,
+          "amount": 35,
+          "mode": "set"
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    },
+    {
+      "id": "build-9-with-a-49",
+      "on": "betWon:place",
+      "when": "phase == 'inside' && lastBuildRoll != rollNumber && betAmount('place', 9) < 35",
+      "do": [
+        {
+          "action": "bet",
+          "type": "place",
+          "number": 9,
+          "amount": 35,
+          "mode": "set"
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    },
+    {
+      "id": "buy-4-and-10",
+      "description": "Inside is fully built: the next $49 hit buys the 4 and 10 for $25 each ($204 across). After that, collect only.",
+      "on": "betWon:place",
+      "when": "phase == 'inside' && lastBuildRoll != rollNumber && (!hasBet('buy', 4) || !hasBet('buy', 10))",
+      "do": [
+        {
+          "action": "log",
+          "message": "inside built. buying the 4 and 10 for 25 each"
+        },
+        {
+          "action": "bet",
+          "type": "buy",
+          "numbers": [
+            4,
+            10
+          ],
+          "amount": 25
+        },
+        {
+          "action": "set",
+          "var": "lastBuildRoll",
+          "value": "rollNumber"
+        }
+      ]
+    }
+  ],
+  "notes": "Imported from the transcript of 9CrEZy0T_r0 (auto captions). Rules as implemented: (1) $25 table, $2000 buy-in, level starts at 1. (2) Lay phase: place 8 for $120 x level and lay 6 for $120 x level, both working on the come-out ('we want to take advantage of every chance of hitting an eight'). (3) A 6 while laying loses the lay; go UP ONE STEP on both bets (+$120 each: 240/240, then 360/360). Crappy says 'we're going to go up one every time' and explicitly distinguishes this from a Martingale he also tried, so step 3 is 360, not 480. The old notes said 'double the lay'; that matches only the first step and misses that the place 8 goes up too ('we're gonna go up one if we hit a six on both'). (4) A 7 while laying (come-out or seven-out) loses the place 8 and wins the lay (net -$20 at 120, -$40 at 240); reset to level 1 and set the same bets back up ('you could continue on with the 240 ... but I think you're better off play it safe'). (5) An 8 while laying, at ANY level: collect the place win, pull the lay (vig returned), bank $10 and regress the place 8 into $110 inside (5 $25, 6 $30, 8 $30, 9 $25). At level 2 the 8 pays $280 and he still drops to $110 inside. Place bets are off on the come-out from then on ('the only time we work the come-out is with the lay back on'). (6) Inside build: when an unbuilt number hits ($35), press it to the $49-pay level with part of that win (5/9 to $35 using $10, 6/8 to $42 using $12). When a built number hits ($49), use it to build one remaining number; he built the 6, then the 8, then whichever of 5/9 was left, one press per hit. The order 6, 8, 5, 9 is my reading of the live play; the video never states a rule for it. (7) Once all four inside are built, the next $49 hit buys the 4 and 10 for $25 each (he hands over $50 plus $2 vig), making $204 across. After that he only collects ('just keep collecting fifty dollars a pop'). (8) Seven-out with the spread up: everything is gone; next shooter starts over at level 1. A come-out 7 with the spread up costs nothing (bets off). ASSUMPTIONS AND AMBIGUITIES: (a) Bankroll: the video never says what to do when the rack cannot cover the next step of the progression (he only says 'you take a chance of losing everything ... when you run out of bankroll' and that he has seen five 6s in a row). Implemented: walk away when the next level cannot be funded; staying at the highest affordable level is the other reading. (b) Vig: he pays the lay vig up front ($5 per $120 lay, $10 per $240) and gets it back when the lay comes down after an 8. The engine's default 'on-win' vig has the same net effect on the 7 and 8 paths but charges nothing when the lay LOSES to a 6, so the engine is $5/$10 per lost lay kinder than his casino. The engine's 'up-front' mode would instead forfeit the vig every time the lay is pulled after an 8, which is further from the video, so the default was kept. Buy vig is paid on each win ($1 on $25), matching his 're-buy the 10' casino. (c) The $10 he banks when converting the place 8 to $110 inside is exactly the difference between $120 and $110; the $140 (or $280) win is also banked, not reinvested. (d) The press amounts are only ever taken from that roll's winnings; the engine's press rounds down and 'max' caps the result at 35/42, so $25 of a $35 win is collected on 5/9 and $23 on 6/8, matching the chips he hands over. (e) He mentions the banked $10 could fund hardways 'if you like the hard ways'; not implemented. (f) No win goal or stop loss is stated; he played about eight shooters and quit up $492. 'unit' is set to the $120 progression step for documentation; every amount is written in dollars because the $110 inside spread and the $25 buys are tied to the $25 table, so a --unit override does not scale this strategy. (Engine update after import: table.layVig is set to 'up-front', which now matches the video's casino exactly: $5 per $120 lay paid when the lay goes up, refunded when it is pulled after the 8 hits, forfeited when the 6 knocks the lay off. Buy vig on the 4/10 stays 'on-win'.)"
+}

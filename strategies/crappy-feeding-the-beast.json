@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "id": "crappy-feeding-the-beast",
+  "name": "Feeding the beast",
+  "description": "Crappy's 'feed the outside' place progression combined with his continuous don't come. No line bet; $30 six and eight once a point is set. The first 6/8 hit ($35) buys $20 on the 9 and $15 on the 10, the next $35 hit covers the 5 and 4 the same way, and from then on every hit sends a $25 green to the don't come (don't pass if the hit made the point) and uses the $10 in red to press two outside numbers $5 each, alternating 9/10 and 5/4. The 4 and 10 become buy bets at $20. Everything stays up until the seven, which kills the place bets and pays every don't.",
+  "tags": ["youtube", "crappy", "right-side", "dark-side", "hybrid", "press", "place", "buy", "dont-come"],
+  "source": {
+    "type": "youtube",
+    "url": "https://www.youtube.com/watch?v=ba185s-MRm8",
+    "videoId": "ba185s-MRm8",
+    "title": "Feeding the beast craps strategy",
+    "channel": "Crappy the Crapsman",
+    "importedAt": "2026-11-05"
+  },
+  "unit": 5,
+  "bankroll": 600,
+  "table": { "minBet": 15, "buyVig": "on-win" },
+  "variables": { "budget": 0, "pressPair": 0, "convert": 0 },
+  "rules": [
+    {
+      "id": "reset-budget",
+      "description": "The chips from this roll's place/buy win that still have to be dealt out. Starts every decision point at zero.",
+      "do": [{ "action": "set", "var": "budget", "value": 0 }]
+    },
+    {
+      "id": "collect",
+      "description": "A place or buy bet just paid: that payout is what gets spread, fed to the don't, or pressed.",
+      "on": ["betWon:place", "betWon:buy"],
+      "do": [
+        { "action": "set", "var": "budget", "value": "bet.payout" },
+        { "action": "log", "message": "the {bet.number} paid ${bet.payout}" }
+      ]
+    },
+    {
+      "id": "walk-when-broke",
+      "description": "He plays 'as long as I got the chips to do it': if the rack can't cover $30 six and eight at a new point, the session is over.",
+      "on": "pointEstablished",
+      "when": "!hasBet('place', 6) && bankroll < 60",
+      "do": [
+        { "action": "log", "message": "can't cover $30 six and eight with ${bankroll}, done" },
+        { "action": "walkAway", "mode": "rideOut" }
+      ]
+    },
+    {
+      "id": "six-eight",
+      "description": "No pass line or don't pass. Once a point is set: $30 on the 6 and $30 on the 8 (even when one of them is the point). Off on the come-out by table default.",
+      "on": "pointEstablished",
+      "when": "hasBet('place', 6) || bankroll >= 60",
+      "do": [{ "action": "bet", "type": "place", "numbers": [6, 8], "amount": 30 }]
+    },
+    {
+      "id": "spread-9-10",
+      "description": "First $35 hit: $20 place 9 and $15 place 10.",
+      "when": "budget >= 35 && !hasBet('place', 9)",
+      "do": [
+        { "action": "bet", "type": "place", "number": 9, "amount": 20 },
+        { "action": "bet", "type": "place", "number": 10, "amount": 15 },
+        { "action": "set", "var": "budget", "value": "budget - 35" },
+        { "action": "log", "message": "spreading out: $20 nine, $15 ten" }
+      ]
+    },
+    {
+      "id": "spread-5-4",
+      "description": "Next $35 hit: $20 place 5 and $15 place 4, now covered across.",
+      "when": "budget >= 35 && hasBet('place', 9) && !hasBet('place', 5)",
+      "do": [
+        { "action": "bet", "type": "place", "number": 5, "amount": 20 },
+        { "action": "bet", "type": "place", "number": 4, "amount": 15 },
+        { "action": "set", "var": "budget", "value": "budget - 35" },
+        { "action": "log", "message": "spreading out: $20 five, $15 four, across now" }
+      ]
+    },
+    {
+      "id": "feed-dont-come",
+      "description": "Every other hit while a point is on: the $25 green goes to the don't come ('the dome').",
+      "when": "budget >= 25 && pointOn",
+      "do": [
+        { "action": "bet", "type": "dontCome", "amount": 25, "mode": "add" },
+        { "action": "set", "var": "budget", "value": "budget - 25" },
+        { "action": "log", "message": "feeding the beast: $25 don't come" }
+      ]
+    },
+    {
+      "id": "feed-dont-pass",
+      "description": "If the hit was the point itself the next roll is a come-out, so the green goes on the don't pass instead.",
+      "when": "budget >= 25 && comeOut",
+      "do": [
+        { "action": "bet", "type": "dontPass", "amount": 25, "mode": "add" },
+        { "action": "set", "var": "budget", "value": "budget - 25" },
+        { "action": "log", "message": "point made, feeding the beast on the don't pass: $25" }
+      ]
+    },
+    {
+      "id": "press-pair",
+      "description": "The $10 in red presses two outside numbers $5 each, alternating the 9/10 pair and the 5/4 pair. Whatever is left (the $2-$4 in white) goes in the rack.",
+      "when": "budget >= 10 && hasBet('place', 5)",
+      "do": [
+        { "action": "press", "target": { "type": ["place", "buy"], "number": 9 }, "by": "pressPair == 0 ? 5 : 0" },
+        { "action": "press", "target": { "type": ["place", "buy"], "number": 10 }, "by": "pressPair == 0 ? 5 : 0" },
+        { "action": "press", "target": { "type": ["place", "buy"], "number": 5 }, "by": "pressPair == 1 ? 5 : 0" },
+        { "action": "press", "target": { "type": ["place", "buy"], "number": 4 }, "by": "pressPair == 1 ? 5 : 0" },
+        { "action": "log", "message": "pressing the {pressPair == 0 ? '9 and 10' : '5 and 4'} $5 each, ${budget - 10} to the rack" },
+        { "action": "set", "var": "pressPair", "value": "1 - pressPair" },
+        { "action": "set", "var": "budget", "value": "budget - 10" }
+      ]
+    },
+    {
+      "id": "buy-the-4",
+      "description": "Once the 4 reaches $20 it becomes a buy bet (vig paid on each win, the 'rebuy' in the video).",
+      "when": "betAmount('place', 4) >= 20",
+      "do": [
+        { "action": "set", "var": "convert", "value": "betAmount('place', 4)" },
+        { "action": "takeDown", "target": "place:4" },
+        { "action": "bet", "type": "buy", "number": 4, "amount": "convert" },
+        { "action": "log", "message": "buying the 4 for ${convert}" }
+      ]
+    },
+    {
+      "id": "buy-the-10",
+      "description": "Same for the 10.",
+      "when": "betAmount('place', 10) >= 20",
+      "do": [
+        { "action": "set", "var": "convert", "value": "betAmount('place', 10)" },
+        { "action": "takeDown", "target": "place:10" },
+        { "action": "bet", "type": "buy", "number": 10, "amount": "convert" },
+        { "action": "log", "message": "buying the 10 for ${convert}" }
+      ]
+    },
+    {
+      "id": "reset-press-cycle",
+      "description": "After the seven everything right-side is gone; the next shooter starts the ladder over.",
+      "on": "sevenOut",
+      "do": [{ "action": "set", "var": "pressPair", "value": 0 }]
+    },
+    {
+      "id": "work-come-out-when-hedged",
+      "description": "Variant he mentions at 32:43 but did not do in this session: 'when I get a bunch of don'ts up there I work the come-out because we're protected'. Disabled; enable to test it ('a bunch' taken as three).",
+      "enabled": false,
+      "on": "comeOut",
+      "when": "betCount('dontCome') >= 3",
+      "do": [{ "action": "setWorking", "target": "box", "working": true }]
+    },
+    {
+      "id": "restore-come-out-default",
+      "description": "Companion to work-come-out-when-hedged: back to off-on-the-come-out once a point is set.",
+      "enabled": false,
+      "on": "pointEstablished",
+      "do": [{ "action": "setWorking", "target": "box", "working": null }]
+    }
+  ],
+  "notes": "Source is auto-captions; 'the dome', 'the dough', 'the dump', 'donuts' are all mis-hearings of 'the don't' (don't come). The video plays two variants side by side; this file is the one he names 'feeding the beast' (the don't-come side), not the pure 'feed the outside' side that keeps pressing the 9/10 by $20/$15 and only collects. $15 table, $600 buy-in. He never bets the pass line or don't pass on his own come-out. Despite the task brief, the video has no lay bets: the dark-side bets are flat $25 don't come / don't pass with no odds; the outside bets are place bets, with the 4 and 10 bought once they reach $20. Assumptions: (1) Ladder order. In session 1 he covered the 5/4 on the second 6/8 hit ('normally I would press up this side... but I'm going to get covered on all the numbers'); in session 2 he did the don't+press on hit two and spread to the 5/4 on hit three. This file spreads first (hit 1: 9/10, hit 2: 5/4) and starts feeding the don't from hit three, because he says the point is to 'get all the way across' and that order gives one deterministic rule. (2) Which two bets get the $5 presses is never stated; he says 'press both of these up five dollars each'. Implemented as alternating pairs 9/10 then 5/4, which reproduces the amounts seen on camera (9 at $30, 10 at $25 bought, 4 at $25 bought, 5 at $30). (3) Pressing happens whenever at least $10 is left after the $25 don't; the one $50 buy-4 payout on camera went '$25 to the don't, one green to the rack' with no press, so this file is slightly more aggressive on $39+/$42+ payouts. Payouts of $27/$28 (the $15 ten / $20 nine or five) feed the don't and pocket the $2-$3 exactly as on camera. (4) Only one $25 don't per hit ('every one of his green chips is going to the don't... at least one of them'). A don't come that bars on a 12 just waits in the come area for the next roll (a 12 is never a hit, so it never collides with a new green). A don't come or don't pass that wins on a 2/3 is collected, not replaced. (5) A don't 'knocked off' when its number rolls is simply lost; nothing replaces it until the next place/buy hit. (6) The 6 and 8 stay at $30 forever; he never presses them. (7) Buy vig is 5% ($1 min) charged on every win ('it's gonna have to rebuy the bet'), the engine default; buying at $20 pays $39 vs $36 placed. (8) No win goal or stop loss stated; he played five shooters because of video length. The only exit rule is walking when the rack can't cover $30 six and eight at a new point. The engine's default exit mode (take removable bets down) would also take down don't bets if a run-level win goal or shooter cap ends a session mid-hand, which he would not do; usually irrelevant because caps trigger on the seven-out when nothing is up. (9) Place/buy bets are off on the come-out, as on camera ('our bets are off'); his 'work the come-out when I have a bunch of don'ts up' variant is included as two disabled rules. (10) Place bets go up only after a point; on the first roll of a new shooter he waits for the point even if the previous shooter's don'ts were just paid."
+}

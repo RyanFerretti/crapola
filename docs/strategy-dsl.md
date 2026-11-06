@@ -54,7 +54,9 @@ A strategy is one JSON document. The engine evaluates its `rules` at every **dec
 - `on`: a trigger or list of triggers. Omit it to evaluate the rule at **every** decision point (pair that with `when`, and remember `bet` actions default to *ensure*, so repeating them is harmless).
 - `when`: an expression that must be truthy.
 - `once`: fire at most once per `shooter`, `point` (while a point is on, or during one come-out stretch), `session`, or `roll` (decision point).
+- `stop: true`: when this rule fires, skip the remaining rules at this decision point. Together with `when` this gives if/else chains.
 - `enabled: false` turns a rule off.
+- Every action may carry its own `when`. All of a rule's action conditions are evaluated **before** any of its actions run, against the state the rule saw, so a list of them reads as if/else: `"do": [{ "action": "bet", ..., "when": "!hasBet('place', 9)" }, { "action": "press", ..., "when": "hasBet('place', 9)" }]` places the 9 the first time and presses it afterwards, never both in one roll.
 
 ### Triggers
 
@@ -106,7 +108,7 @@ Functions:
 
 | call | value |
 |---|---|
-| `hasBet(type[, number])` | e.g. `hasBet('place', 6)`, `hasBet('come')` |
+| `hasBet(type[, number])` | e.g. `hasBet('place', 6)`, `hasBet('come')`; number `0` means a come/don't come that has not travelled yet, so `betCount('dontCome') - betCount('dontCome', 0)` is the number of don't comes sitting on numbers |
 | `betCount([type[, number]])` | how many such bets are up |
 | `betAmount(type[, number])` | amount on that bet (0 if none) |
 | `totalOn(type \| 'inside' \| 'outside' \| 'across' \| 'all')` | total staked |
@@ -128,12 +130,13 @@ Functions:
 { "action": "bet", "type": "hardway", "number": 8, "amount": 5, "working": true }
 { "action": "bet", "type": "hop", "hop": [3, 4], "amount": 1 }
 { "action": "bet", "type": "place", "number": 6, "amount": 30, "mode": "set" }
+{ "action": "bet", "type": "hardway", "number": "bet.number", "amount": "bet.payout", "mode": "add" }
 ```
 
 | field | meaning |
 |---|---|
 | `type` | `pass`, `dontPass`, `come`, `dontCome`, `odds`, `place`, `buy`, `lay`, `field`, `hardway`, `anySeven`, `anyCraps`, `two`, `three`, `eleven`, `twelve`, `ce`, `horn`, `world`, `hop`, `big6`, `big8` |
-| `number` / `numbers` | box number(s); `numbers` may be a list or `inside` (5 6 8 9), `outside` (4 5 9 10), `across` (4 5 6 8 9 10) |
+| `number` / `numbers` | box number(s); `numbers` may be a list or `inside` (5 6 8 9), `outside` (4 5 9 10), `across` (4 5 6 8 9 10). `number` may also be an expression, e.g. `"bet.number"` in a bet-event rule or `"point"` |
 | `skipPoint` | leave the point number out of `numbers` |
 | `on` | odds only: `pass`, `come`, `dontPass`, `dontCome`. Without `number`, odds go on every such flat bet that has none. |
 | `amount` | dollars or an expression; `multiple` (times the flat bet) and `max: true` are for odds |
@@ -144,7 +147,7 @@ Functions:
 
 Amounts are rounded to casino increments by default (`up`): $6 steps on place 6/8, $5 on place 4/5/9/10, odds in steps that pay evenly, lay bets in $2/$3/$6 steps. Odds are capped at the table maximum and rounded down.
 
-Engine conventions: place, buy and hardway bets are **off on the come-out** unless `working: true`; lay bets and don't odds are always on; come odds are off on the come-out. A pass bet while the point is on is a put bet. A come bet is only accepted while the point is on. Don't pass can't be made after the point. Same-slot bets merge: a second `add` on Place 6 presses it.
+Engine conventions: place, buy and hardway bets are **off on the come-out** unless `working: true`; lay bets and don't odds are always on; come odds are off on the come-out. A pass bet while the point is on is a put bet. A come bet is only accepted while the point is on. Don't pass can't be made after the point. Same-slot bets merge: a second `add` on Place 6 presses it. Buy and lay commission is charged on each win by default (`table.buyVig` / `table.layVig: "on-win"`); with `"up-front"` it is paid once when the bet goes up, refunded if the bet is taken down, and lost with the bet.
 
 ### `press`
 
@@ -154,7 +157,7 @@ Engine conventions: place, buy and hardway bets are **off on the come-out** unle
 { "action": "press", "target": "inside", "by": "1u" }
 ```
 
-`by`: `winnings` (default, the payout of the bet that just won), `half`, `full` (double it), or an amount. Rounds **down** to the increment so you never press more than you won. `max` caps the resulting bet.
+`by`: `winnings` (default, the payout of the bet that just won), `half`, `full` (double it), or an amount. Rounds **down** to the increment (regardless of the document `rounding`) so you never press more than you won. `max` caps the resulting bet. To press *to* an exact amount use `regress` with `to`, or `bet` with `mode: "set"`; both move in either direction. A press the rack cannot fund is logged as a rejected bet.
 
 ### `regress`
 
@@ -191,7 +194,9 @@ Sets every matching bet to `to` (0 takes it down).
 { "action": "log", "message": "pressing the 6 to {betAmount('place', 6)}" }
 ```
 
-While sitting out no rules fire; existing bets stay as they are. `walkAway` ends the session (takeable bets come down, contracts ride).
+While sitting out no rules fire; existing bets stay as they are. `walkAway` ends the session (takeable bets come down, contracts ride) and no later rule runs.
+
+A session also ends as `busted` when the strategy keeps asking for bets the rack cannot fund, with nothing on the table, for a full shooter. Strategies with a unit far above the table minimum should still add their own `walkAway` or `exit.stopLoss` if they want to leave earlier.
 
 ### Selectors
 

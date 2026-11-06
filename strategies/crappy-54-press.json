@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "id": "crappy-54-press",
+  "name": "Crappy's 54 press",
+  "description": "Wait for a point, place $30 each on the 6 and 8. The first 8 hit buys a $35 place 9, the first 6 hit buys a $35 place 5. From then on every $30 six/eight hit is collected, while every 9 hit ($49) plus $5 from the rack power-presses the 8 by $54 and every 5 hit presses the 6 by $54. When a pressed 6 or 8 hits, collect and regress it to $30. Nothing works on the come-out; after a seven-out start over at $30 six and eight on the next point.",
+  "tags": ["youtube", "crappy", "right-side", "place", "press", "inside"],
+  "source": {
+    "type": "youtube",
+    "url": "https://www.youtube.com/watch?v=pC3Xdger1WY",
+    "videoId": "pC3Xdger1WY",
+    "title": "54 press winning craps strategy",
+    "channel": "Crappy the Crapsman",
+    "importedAt": "2026-11-05"
+  },
+  "unit": 30,
+  "bankroll": 600,
+  "table": { "minBet": 25 },
+  "variables": { "base68": 30, "fiveNine": 35, "pressBy": 54 },
+  "rules": [
+    {
+      "id": "busted",
+      "description": "Nothing on the table and not enough in the rack for $30 six and eight: the session is over.",
+      "on": "pointEstablished",
+      "when": "betCount() == 0 && bankroll < base68 * 2",
+      "do": [
+        { "action": "log", "message": "only ${bankroll} left, can't buy the 6 and 8, done" },
+        { "action": "walkAway" }
+      ]
+    },
+    {
+      "id": "start-6-8",
+      "description": "Point set (any point, 6 or 8 included): $60 to the dealer, $30 six and eight, off on the come-out.",
+      "on": "pointEstablished",
+      "when": "bankroll >= base68 * 2",
+      "do": [{ "action": "bet", "type": "place", "numbers": [6, 8], "amount": "base68" }]
+    },
+    {
+      "id": "eight-first-hit-buys-nine",
+      "description": "First 8 hit ($35): drop the $35 on the 9. 'First' means the 9 isn't up yet, even if 9 is the point.",
+      "on": "betWon:place:8",
+      "when": "!hasBet('place', 9)",
+      "do": [
+        { "action": "log", "message": "first 8, dropping the $35 on the 9" },
+        { "action": "bet", "type": "place", "number": 9, "amount": "fiveNine" }
+      ]
+    },
+    {
+      "id": "pressed-eight-hit-regress",
+      "description": "A pressed 8 (anything above $30) hits: collect and drop it back to $30. (He did this every time; leaving it up is optional.)",
+      "on": "betWon:place:8",
+      "when": "bet.amount > base68",
+      "do": [
+        { "action": "log", "message": "pressed 8 paid ${bet.payout}, dropping the 8 back to $30" },
+        { "action": "regress", "target": "self", "to": "base68" }
+      ]
+    },
+    {
+      "id": "six-first-hit-buys-five",
+      "description": "First 6 hit ($35): drop the $35 on the 5. 'First' means the 5 isn't up yet, even if 5 is the point.",
+      "on": "betWon:place:6",
+      "when": "!hasBet('place', 5)",
+      "do": [
+        { "action": "log", "message": "first 6, dropping the $35 on the 5" },
+        { "action": "bet", "type": "place", "number": 5, "amount": "fiveNine" }
+      ]
+    },
+    {
+      "id": "pressed-six-hit-regress",
+      "description": "A pressed 6 (anything above $30) hits: collect and drop it back to $30.",
+      "on": "betWon:place:6",
+      "when": "bet.amount > base68",
+      "do": [
+        { "action": "log", "message": "pressed 6 paid ${bet.payout}, dropping the 6 back to $30" },
+        { "action": "regress", "target": "self", "to": "base68" }
+      ]
+    },
+    {
+      "id": "nine-presses-eight",
+      "description": "The $35 nine pays $49: add $5 from the rack and press the 8 by $54 (30 -> 84 -> 138 -> 192 ...). If the rack can't cover the extra $5, press by the $49 won (rounds to $48).",
+      "on": "betWon:place:9",
+      "do": [
+        { "action": "press", "target": "place:8", "by": "bankroll >= pressBy ? pressBy : bet.payout" },
+        { "action": "log", "message": "nine hit, 8 pressed to ${betAmount('place', 8)}" }
+      ]
+    },
+    {
+      "id": "five-presses-six",
+      "description": "The $35 five pays $49: add $5 from the rack and press the 6 by $54. Same fallback as the 9.",
+      "on": "betWon:place:5",
+      "do": [
+        { "action": "press", "target": "place:6", "by": "bankroll >= pressBy ? pressBy : bet.payout" },
+        { "action": "log", "message": "five hit, 6 pressed to ${betAmount('place', 6)}" }
+      ]
+    },
+    {
+      "id": "shooter-hop-12",
+      "description": "Not part of the system: at Cherokee he tosses $1 on the hop 12 on his own come-out so he can shoot without a line bet. Disabled; enable to model it.",
+      "enabled": false,
+      "on": "comeOut",
+      "do": [{ "action": "bet", "type": "hop", "hop": [6, 6], "amount": 1 }]
+    }
+  ],
+  "notes": "Source: 'something about 54' as he names it at the end. The 54 is the press increment: the $35 place 5/9 pays $49, he adds $5 from the rack and tells the dealer 'add 54 to my 6/8'. Not a dollar spread. Table: he says he usually plays the $25 level ('you can play this at any level'); minBet 25. Buy-in $600, 'should be enough for 10 shooters, you might need a little more'. No pass line or don't pass: he waits for the come-out to set a point, then $60 to the dealer for $30 six and eight, including when the point is 6 or 8 (seen several times). Nothing works on the come-out ('somebody hits a couple sevens in a row you'll wish you weren't working'). First 8 hit: the $35 goes on the 9; first 6 hit: the $35 goes on the 5. He identifies 'first' by whether the 9/5 is up ('we know because we're not on the nine'), so that is the condition used, and he places the 5/9 even when it is the point (shooter at 15:44, point 5). After that, $30 six/eight hits are collected. Every 9 hit presses the 8 by $54 (30, 84, 138, 192 seen), every 5 hit presses the 6 by $54; the 5 and 9 themselves stay at $35 and are never pressed or taken down. No press cap stated; the engine's $5000 table max is the only ceiling. Regress: all three times a pressed number hit (192 paid 224, 84 paid 98 twice) he dropped it back to $30 and collected; he says you could leave it up 'if the table's hot' and your bankroll is up, so a hit on a pressed 6/8 regresses to $30 here. After regressing, a later hit on that number is a plain collect (the 5/9 is already up). Seven-out loses everything; the next shooter starts again at $30 six and eight on the next point; point-sevens just cost $60. Assumptions: (1) if the rack has less than $54 after the $49 payout he still presses, by the $49 won (rounds down to $48), rather than skipping the press; never happened in the video. (2) If nothing is on the table and the rack is under $60 when a point is set, the session is treated as busted (walkAway); he never got there but says 'you might end up with nothing in your bankroll'. (3) No win goal or stop loss stated: he played about 12 shooters (went 'into overtime' past his 20 minutes) and colored up +$210 from $600; exit is left empty, so runs use the CLI default shooter count. (4) Props: no horn or prop bet is actually made; 'see a horn, better horn' is commentary on horn rolls. The only prop mentioned is a $1 hop 12 when he is the shooter at Cherokee so he can shoot without a line bet; included as a disabled rule since the engine does not know who is shooting. (5) The $5 'to the dealer' on each press is not a tip: the dealer hands $50 for the $49 win, he pushes $5 back and the dealer adds $54 to the number; net $5 from the rack per press, no money to the dealer. (6) Captions mis-hear '30 six and eight' as '30.68' and 'you' as 'yo'; amounts were reconciled against the payouts he calls out (35, 49, 98, 224)."
+}

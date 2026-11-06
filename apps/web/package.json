@@ -1,0 +1,27 @@
+{
+  "name": "@crapola/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "dev:api": "bun --hot server/index.ts",
+    "dev:ui": "bunx vite --host 127.0.0.1",
+    "build": "bunx vite build",
+    "start": "bun server/index.ts"
+  },
+  "dependencies": {
+    "@crapola/engine": "workspace:*",
+    "@crapola/store": "workspace:*",
+    "hono": "^4.6.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "vite": "^6.0.0"
+  }
+}

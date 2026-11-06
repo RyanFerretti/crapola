@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "pass-line-horn-hedge",
+  "name": "Pass line with a horn hedge",
+  "description": "Pass line and a $4 horn on every come-out so the craps numbers pay something, max odds behind the point, and a dollar each on the hard 6 and 8 while the point is on. Covers the come-out props the imported strategies don't use.",
+  "tags": ["classic", "right-side", "props", "hedge"],
+  "source": { "type": "classic" },
+  "unit": 10,
+  "bankroll": 500,
+  "rules": [
+    { "id": "line", "on": "comeOut", "do": [{ "action": "bet", "type": "pass", "amount": "1u" }] },
+    { "id": "horn", "on": "comeOut", "do": [{ "action": "bet", "type": "horn", "amount": 4 }] },
+    { "id": "odds", "on": "pointEstablished", "do": [{ "action": "bet", "type": "odds", "on": "pass", "max": true }] },
+    { "id": "hardways", "on": "pointOn", "do": [{ "action": "bet", "type": "hardway", "numbers": [6, 8], "amount": 1 }] },
+    { "id": "any-seven-hedge", "on": "pointOn", "when": "rollsSincePoint >= 6", "do": [{ "action": "bet", "type": "anySeven", "amount": 1 }] }
+  ]
+}

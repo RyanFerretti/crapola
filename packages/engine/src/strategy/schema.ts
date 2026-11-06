@@ -29,14 +29,19 @@ export const SelectorObjectSchema = z
 export const SelectorSchema = z.union([z.string().min(1), SelectorObjectSchema]);
 export type SelectorInput = z.infer<typeof SelectorSchema>;
 
-const base = { description: z.string().optional() };
+const base = {
+  description: z.string().optional(),
+  /** Run this action only when the expression is truthy. */
+  when: z.string().optional(),
+};
 
 export const BetActionSchema = z
   .object({
     ...base,
     action: z.literal('bet'),
     type: BetTypeSchema,
-    number: z.number().int().optional(),
+    /** A box number, or an expression such as "bet.number" or "point". */
+    number: z.union([z.number().int(), z.string().min(1)]).optional(),
     /** Several numbers at once: [6, 8] or "inside" / "outside" / "across". */
     numbers: z.union([z.array(z.number().int()), NumberGroupSchema]).optional(),
     /** Skip the current point when betting several numbers. */
@@ -142,6 +147,8 @@ export const RuleSchema = z
     do: z.array(ActionSchema).min(1),
     /** Fire at most once per shooter, point cycle, session, or decision point. */
     once: z.enum(['shooter', 'point', 'session', 'roll']).optional(),
+    /** When this rule fires, skip the remaining rules at this decision point (if/else chains). */
+    stop: z.boolean().optional(),
     enabled: z.boolean().optional(),
   })
   .strict();

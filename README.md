@@ -86,7 +86,42 @@ The skill fetches the transcript (yt-dlp through `uvx`, so `uv` must be installe
 bun run web
 ```
 
-Starts the Hono API on port 4242 and the Vite dev server on port 5173. See `apps/web/README.md` for details.
+Starts the Hono API on port 4242 and the Vite dev server on port 5173 (or the next free port). See `apps/web/README.md` for the pages and API routes.
+
+![strategy bank](docs/screenshots/strategies.png)
+![strategy editor](docs/screenshots/editor.png)
+![narrated play](docs/screenshots/play.png)
+![run detail](docs/screenshots/run-detail.png)
+
+## The strategy bank
+
+| id | what | source |
+|---|---|---|
+| `pass-line-max-odds` | pass line, 3-4-5x odds | classic |
+| `dont-pass-lay-odds` | don't pass, max lay odds | classic |
+| `three-point-molly` | pass plus two come bets, all with max odds | classic |
+| `place-6-8` | two units on the 6 and 8 | classic |
+| `iron-cross` | place 5, 6, 8 and the field every roll | classic |
+| `pass-line-horn-hedge` | pass line with a horn on the come-out, hardways and a late any-seven | classic |
+| `double-dont` | Martingale on the don't pass, bail past level four | classic |
+| `continuous-dont` | one don't pass or don't come always working, levelled progression | port of the old Python sim |
+| `cold-table` | four units per shooter: don't pass, two comes, a don't come | port |
+| `corey-hedge` | pass, odds on 6/8, two comes, field hedge | port |
+| `crappy-54-press` | $30 six and eight, first hits buy the 5 and 9, 5/9 hits press the 6/8 by $54, regress on a pressed hit | Crappy the Crapsman |
+| `crappy-easy-hard-way` | $100 don't pass hedge, place 4/6/8/10 with hardways behind them, easy hits re-buy the hardway | Crappy |
+| `crappy-feeding-the-beast` | $30 six and eight, winnings spread to the outside, then every green to a don't come | Crappy |
+| `crappy-hedgie-wedgy` | doey-don't with a hop 12, lay odds sized to win the flat, one don't come covered by a yo | Crappy |
+| `crappy-place-to-lay` | lay the 6 and place the 8 at $120, step up on a 6, after an 8 regress into $110 inside and build across | Crappy |
+
+Every imported document records its video under `source` and the importer's assumptions under `notes`. Between them the bank exercises pass, don't pass, come, don't come, odds both ways, place, buy, lay, field, hardways, horn, hop and any-seven on both the come-out and later rolls; the kitchen-sink test in `packages/engine/test/coverage.test.ts` places all 22 bet types through the DSL.
+
+## Reading the numbers
+
+- `mean`, `median`, `p5`, `p95` are session profits in dollars over the configured shooters.
+- `win%` is the share of sessions that ended ahead; `bust%` the share that ran out of money. A strategy whose minimum buy-in is above the table minimum can stall with a few chips left instead of busting; give it a `walkAway` rule or a stop loss if that matters.
+- `edge` is mean loss divided by dollars put at risk, where a place bet counts once no matter how many rolls it sits through. That is why place strategies show a larger number than the textbook per-decision edge (1.52% on the 6 and 8). Use it to compare strategies with each other, not against the textbook.
+- `$/roll` is the most honest cross-strategy number: expected profit per dice roll at the table.
+- The head-to-head matrix uses the same dice for every strategy, so it answers "which system would have done better on these rolls" without sampling noise between them.
 
 ## Tests
 

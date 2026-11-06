@@ -6,6 +6,8 @@ export interface LibraryEntry {
   id: string;
   file: string;
   doc: StrategyDoc | null;
+  /** The file's JSON as written, for repairing invalid documents. */
+  raw: unknown;
   issues: ValidationIssue[];
   warnings: string[];
 }
@@ -35,11 +37,11 @@ export class StrategyLibrary {
     try {
       raw = JSON.parse(readFileSync(file, 'utf8'));
     } catch (e) {
-      return { id: basename(file, '.json'), file, doc: null, issues: [{ path: '(file)', message: `invalid JSON: ${(e as Error).message}` }], warnings: [] };
+      return { id: basename(file, '.json'), file, doc: null, raw: null, issues: [{ path: '(file)', message: `invalid JSON: ${(e as Error).message}` }], warnings: [] };
     }
     const v = validateStrategyDoc(raw);
-    if (!v.ok) return { id: (raw as { id?: string })?.id ?? basename(file, '.json'), file, doc: null, issues: v.issues, warnings: [] };
-    return { id: v.doc.id, file, doc: v.doc, issues: [], warnings: v.warnings };
+    if (!v.ok) return { id: (raw as { id?: string })?.id ?? basename(file, '.json'), file, doc: null, raw, issues: v.issues, warnings: [] };
+    return { id: v.doc.id, file, doc: v.doc, raw, issues: [], warnings: v.warnings };
   }
 
   pathFor(id: string): string {

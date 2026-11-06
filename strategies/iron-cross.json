@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "iron-cross",
+  "name": "Iron cross",
+  "description": "Place the 5, 6 and 8 and play the field every roll so every number but the 7 pays something.",
+  "tags": ["classic", "right-side", "field", "place"],
+  "source": { "type": "classic" },
+  "unit": 5,
+  "bankroll": 300,
+  "table": { "minBet": 5 },
+  "rules": [
+    { "id": "place", "on": "pointOn", "do": [{ "action": "bet", "type": "place", "numbers": [5, 6, 8], "skipPoint": true, "amount": "2u" }] },
+    { "id": "field", "on": "pointOn", "do": [{ "action": "bet", "type": "field", "amount": "1u" }] }
+  ]
+}

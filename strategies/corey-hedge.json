@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "id": "corey-hedge",
+  "name": "Corey's pass, come and field (ported)",
+  "description": "Pass line, three units of odds when the point is 6 or 8, up to two come bets, and a field bet whenever the come bets avoid the 4 and 10.",
+  "tags": ["ported", "right-side", "field"],
+  "source": { "type": "ported", "notes": "Port of corey() in customstrat.py from the old craps-sim repo." },
+  "unit": 5,
+  "bankroll": 200,
+  "table": { "minBet": 5 },
+  "rules": [
+    { "id": "line", "on": "comeOut", "do": [{ "action": "bet", "type": "pass", "amount": "1u" }] },
+    { "id": "odds-68", "on": "pointOn", "when": "point == 6 || point == 8", "do": [{ "action": "bet", "type": "odds", "on": "pass", "amount": "3u" }] },
+    { "id": "come", "on": "pointOn", "when": "betCount('come') < 2", "do": [{ "action": "bet", "type": "come", "amount": "1u" }] },
+    {
+      "id": "field",
+      "on": "pointOn",
+      "when": "betCount('come') > 0 && !hasBet('come', 4) && !hasBet('come', 10)",
+      "do": [{ "action": "bet", "type": "field", "amount": "1u" }]
+    }
+  ]
+}

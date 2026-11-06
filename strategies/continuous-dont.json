@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "continuous-dont",
+  "name": "Continuous don't (ported)",
+  "description": "Always one don't pass or don't come working. Each side has its own level: up one unit after a loss, back to one after a win. Never above level three; extra losses bank a 'remainder' that bumps the next reset to level two.",
+  "tags": ["ported", "dark-side", "progression"],
+  "source": {
+    "type": "ported",
+    "notes": "Port of all_the_donts.py from the old craps-sim repo, itself based on Crappy's continuous don't video (GjLsKlP-rQk)."
+  },
+  "unit": 5,
+  "bankroll": 1000,
+  "table": { "minBet": 5 },
+  "variables": { "passLevel": 1, "comeLevel": 1, "remainder": 0 },
+  "rules": [
+    { "id": "dp-lost-cap", "on": "betLost:dontPass", "when": "passLevel >= 3", "do": [{ "action": "increment", "var": "remainder" }] },
+    { "id": "dp-lost", "on": "betLost:dontPass", "when": "passLevel < 3", "do": [{ "action": "increment", "var": "passLevel" }] },
+    {
+      "id": "dp-won",
+      "on": "betWon:dontPass",
+      "do": [
+        { "action": "set", "var": "passLevel", "value": "remainder > 0 ? 2 : 1" },
+        { "action": "set", "var": "remainder", "value": "max(0, remainder - 1)" }
+      ]
+    },
+    { "id": "dc-lost-cap", "on": "betLost:dontCome", "when": "comeLevel >= 3", "do": [{ "action": "increment", "var": "remainder" }] },
+    { "id": "dc-lost", "on": "betLost:dontCome", "when": "comeLevel < 3", "do": [{ "action": "increment", "var": "comeLevel" }] },
+    {
+      "id": "dc-won",
+      "on": "betWon:dontCome",
+      "do": [
+        { "action": "set", "var": "comeLevel", "value": "remainder > 0 ? 2 : 1" },
+        { "action": "set", "var": "remainder", "value": "max(0, remainder - 1)" }
+      ]
+    },
+    { "id": "dont-pass", "on": "comeOut", "do": [{ "action": "bet", "type": "dontPass", "amount": "unit * passLevel" }] },
+    { "id": "dont-come", "on": "pointOn", "do": [{ "action": "bet", "type": "dontCome", "amount": "unit * comeLevel" }] }
+  ]
+}

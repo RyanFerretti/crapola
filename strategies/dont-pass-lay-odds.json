@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "id": "dont-pass-lay-odds",
+  "name": "Don't pass with lay odds",
+  "description": "Dark side baseline: don't pass, then lay the maximum odds once a point is set.",
+  "tags": ["classic", "dark-side", "low-edge"],
+  "source": { "type": "classic" },
+  "unit": 10,
+  "bankroll": 500,
+  "rules": [
+    { "id": "dont", "on": "comeOut", "do": [{ "action": "bet", "type": "dontPass", "amount": "1u" }] },
+    { "id": "lay-odds", "on": "pointEstablished", "do": [{ "action": "bet", "type": "odds", "on": "dontPass", "max": true }] }
+  ]
+}

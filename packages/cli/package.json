@@ -1,0 +1,10 @@
+{
+  "name": "@crapola/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "crapola": "src/index.ts" },
+  "dependencies": {
+    "@crapola/engine": "workspace:*",
+    "@crapola/store": "workspace:*"
+  }
+}

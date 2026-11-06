@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "id": "cold-table",
+  "name": "Cold table (ported)",
+  "description": "Four units per shooter and never more unless you win them. Don't pass on the come-out, then two come bets and a don't come once the point is on. Every pass/come win adds two units to the shooter's allowance.",
+  "tags": ["ported", "hedge"],
+  "source": {
+    "type": "ported",
+    "notes": "Port of cold_table.py from the old craps-sim repo (Crappy's 'cold table' idea, C7BJI2vHhmI)."
+  },
+  "unit": 25,
+  "bankroll": 1000,
+  "variables": { "unitsLeft": 4 },
+  "rules": [
+    { "id": "new-shooter", "on": "newShooter", "do": [{ "action": "set", "var": "unitsLeft", "value": 4 }] },
+    { "id": "won", "on": ["betWon:dontPass", "betWon:come", "betWon:dontCome"], "do": [{ "action": "increment", "var": "unitsLeft", "by": 2 }] },
+    {
+      "id": "dont-pass",
+      "on": "comeOut",
+      "when": "unitsLeft > 0 && !hasBet('dontPass')",
+      "do": [{ "action": "bet", "type": "dontPass", "amount": "1u" }, { "action": "increment", "var": "unitsLeft", "by": -1 }]
+    },
+    {
+      "id": "come",
+      "on": "pointOn",
+      "when": "unitsLeft > 0 && betCount('come') < 2",
+      "do": [{ "action": "bet", "type": "come", "amount": "1u" }, { "action": "increment", "var": "unitsLeft", "by": -1 }]
+    },
+    {
+      "id": "dont-come",
+      "on": "pointOn",
+      "when": "unitsLeft > 0 && betCount('come') >= 2 && betCount('dontCome') < 2",
+      "do": [{ "action": "bet", "type": "dontCome", "amount": "1u" }, { "action": "increment", "var": "unitsLeft", "by": -1 }]
+    }
+  ]
+}

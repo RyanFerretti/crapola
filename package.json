@@ -1,0 +1,22 @@
+{
+  "name": "crapola",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Craps strategy engine and simulator",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "cli": "bun run packages/cli/src/index.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc -p tsconfig.json --noEmit",
+    "web": "bun run --cwd apps/web dev",
+    "web:build": "bun run --cwd apps/web build",
+    "web:start": "bun run --cwd apps/web start"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}

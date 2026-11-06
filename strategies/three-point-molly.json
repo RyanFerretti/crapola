@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "three-point-molly",
+  "name": "Three point molly",
+  "description": "Pass line with max odds plus two come bets with max odds, keeping three numbers working.",
+  "tags": ["classic", "right-side"],
+  "source": { "type": "classic" },
+  "unit": 10,
+  "bankroll": 1000,
+  "rules": [
+    { "id": "line", "on": "comeOut", "do": [{ "action": "bet", "type": "pass", "amount": "1u" }] },
+    { "id": "line-odds", "on": "pointEstablished", "do": [{ "action": "bet", "type": "odds", "on": "pass", "max": true }] },
+    {
+      "id": "come",
+      "on": "pointOn",
+      "when": "betCount('come') < 2",
+      "do": [{ "action": "bet", "type": "come", "amount": "1u" }]
+    },
+    { "id": "come-odds", "on": "betMoved:come", "do": [{ "action": "bet", "type": "odds", "on": "come", "max": true }] }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "id": "double-dont",
+  "name": "Double up don't pass",
+  "description": "Martingale on the don't pass: add a unit after every loss, back to one after a win, sit out the shooter past level four.",
+  "tags": ["progression", "dark-side"],
+  "source": { "type": "classic" },
+  "unit": 10,
+  "bankroll": 500,
+  "variables": { "level": 1 },
+  "rules": [
+    { "id": "lost", "on": "betLost:dontPass", "do": [{ "action": "increment", "var": "level" }] },
+    { "id": "won", "on": "betWon:dontPass", "do": [{ "action": "set", "var": "level", "value": 1 }] },
+    { "id": "bet", "on": "comeOut", "when": "level <= 4", "do": [{ "action": "bet", "type": "dontPass", "amount": "unit * level" }] },
+    {
+      "id": "bail",
+      "on": "comeOut",
+      "when": "level > 4",
+      "do": [{ "action": "set", "var": "level", "value": 1 }, { "action": "sitOut", "until": "nextShooter" }]
+    }
+  ]
+}

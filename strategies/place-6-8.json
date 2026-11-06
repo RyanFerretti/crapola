@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "id": "place-6-8",
+  "name": "Place the 6 and 8",
+  "description": "Two units each on the 6 and 8 once a point is set, off on the come-out, collect every hit.",
+  "tags": ["classic", "right-side", "place"],
+  "source": { "type": "classic" },
+  "unit": 6,
+  "bankroll": 300,
+  "table": { "minBet": 5 },
+  "rules": [
+    { "id": "place", "on": "pointOn", "do": [{ "action": "bet", "type": "place", "numbers": [6, 8], "amount": "2u" }] }
+  ]
+}

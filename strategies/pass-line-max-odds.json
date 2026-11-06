@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "id": "pass-line-max-odds",
+  "name": "Pass line with max odds",
+  "description": "One pass line bet with 3-4-5x odds behind it. The baseline every other strategy should be compared against.",
+  "tags": ["classic", "right-side", "low-edge"],
+  "source": { "type": "classic" },
+  "unit": 10,
+  "bankroll": 500,
+  "rules": [
+    { "id": "line", "on": "comeOut", "do": [{ "action": "bet", "type": "pass", "amount": "1u" }] },
+    { "id": "odds", "on": "pointEstablished", "do": [{ "action": "bet", "type": "odds", "on": "pass", "max": true }] }
+  ]
+}

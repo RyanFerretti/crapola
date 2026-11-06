@@ -10,6 +10,25 @@ bun run cli play crappy-54-press --dice "4 6 8 6 5 9 7"
 bun run web          # http://localhost:5173
 ```
 
+## Requirements
+
+- [Bun](https://bun.sh) 1.2 or newer. Everything runs through it; no Node or npm needed.
+- [uv](https://docs.astral.sh/uv/) only for fetching YouTube transcripts (it runs yt-dlp through `uvx`).
+- tmux is optional but the dev-server convention here uses it.
+
+## Documentation
+
+| doc | read it when |
+|---|---|
+| [docs/strategy-dsl.md](docs/strategy-dsl.md) | you are writing or reading a strategy file: every field, trigger, action, identifier and function |
+| [docs/writing-strategies.md](docs/writing-strategies.md) | you want to encode a system by hand or in the UI: patterns, amounts, how to check it plays right |
+| [docs/importing.md](docs/importing.md) | you want to turn a video into a strategy with the `/import-video` skill |
+| [docs/architecture.md](docs/architecture.md) | you want to know how a roll is processed, how exits work, why results are reproducible |
+| [docs/extending.md](docs/extending.md) | you are adding a bet type, action, trigger, statistic, rule or page |
+| [apps/web/README.md](apps/web/README.md) | the web app's pages, API routes and layout |
+| [packages/engine/README.md](packages/engine/README.md) | using the engine from code, including TypeScript strategies |
+| [packages/store/README.md](packages/store/README.md), [packages/cli/README.md](packages/cli/README.md) | the store and CLI surfaces |
+
 ## Layout
 
 | path | what |
@@ -19,7 +38,7 @@ bun run web          # http://localhost:5173
 | `packages/cli` | `bun run cli ...` |
 | `apps/web` | Vite + React UI with a Hono API: strategy builder, single-session player, batch runs with charts and head-to-head comparisons. |
 | `strategies/` | the strategy bank. Classics, ports of the old Python sims, and imports from Crappy the Crapsman's channel. |
-| `docs/strategy-dsl.md` | the strategy language reference. |
+| `docs/` | guides and the DSL reference (see Documentation above). |
 | `.claude/skills/import-video` | the Claude Code skill that turns a video transcript into a strategy file. |
 
 ## How a simulation works
